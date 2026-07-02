@@ -1,0 +1,33 @@
+name: Sync fork with upstream
+
+# Keeps this fork's master current with PokeAPI/sprites so PKMDS-Blazor (which serves
+# sprites from this fork via jsDelivr) keeps receiving new-gen sprites and upstream fixes.
+# Runs daily and can be triggered manually.
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # every day at 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Never run two syncs at once.
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync master from PokeAPI/sprites
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Calls the same "Sync fork" merge-upstream API as the GitHub UI button. It fast-forwards
+        # when possible, otherwise merges upstream in — which is what we need, since master carries
+        # our own commits (this workflow, static.yml) that upstream doesn't have. No conflict is
+        # expected because upstream never touches those paths; a 409 here would mean a custom sprite
+        # edit collided with an upstream change to the same file, and the sync should be resolved
+        # by hand. --silent discards the JSON body; the step still fails on a non-2xx status.
+        run: gh api --method POST "repos/${{ github.repository }}/merge-upstream" -f branch=master --silent
