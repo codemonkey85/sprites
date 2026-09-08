@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 # Never run two syncs at once.
 concurrency:
@@ -23,11 +23,12 @@ jobs:
     steps:
       - name: Sync master from PokeAPI/sprites
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The built-in GITHUB_TOKEN cannot update files under .github/workflows.
+          # This fine-grained token is scoped to this repository with Contents and Workflows write access.
+          GH_TOKEN: ${{ secrets.UPSTREAM_SYNC_TOKEN }}
         # Calls the same "Sync fork" merge-upstream API as the GitHub UI button. It fast-forwards
         # when possible, otherwise merges upstream in — which is what we need, since master carries
-        # our own commits (this workflow, static.yml) that upstream doesn't have. No conflict is
-        # expected because upstream never touches those paths; a 409 here would mean a custom sprite
-        # edit collided with an upstream change to the same file, and the sync should be resolved
-        # by hand. --silent discards the JSON body; the step still fails on a non-2xx status.
+        # our own commits that upstream doesn't have. A 409 here means a fork edit collided with an
+        # upstream change and the sync should be resolved by hand. --silent discards the JSON body;
+        # the step still fails on a non-2xx status.
         run: gh api --method POST "repos/${{ github.repository }}/merge-upstream" -f branch=master --silent
